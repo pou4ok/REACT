@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Страны Мира — World Explorer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:      #0f1117;
+      --surface: #1a1d27;
+      --card:    #21263a;
+      --accent:  #6c63ff;
+      --accent2: #ff6584;
+      --text:    #e8eaf6;
+      --muted:   #7b82a3;
+      --border:  #2e3455;
+      --radius:  14px;
+      --shadow:  0 8px 32px rgba(0,0,0,.45);
+    }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    body::before {
+      content:''; position:fixed; inset:0; z-index:-1;
+      background: radial-gradient(ellipse 80% 60% at 10% 0%, rgba(108,99,255,.18) 0%, transparent 60%),
+                  radial-gradient(ellipse 60% 50% at 90% 100%, rgba(255,101,132,.13) 0%, transparent 60%);
+      animation: bgShift 12s ease-in-out infinite alternate;
+    }
+    @keyframes bgShift { from{opacity:.7} to{opacity:1} }
+
+    header {
+      background: rgba(26,29,39,.85); backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border); padding: 18px 32px;
+      display: flex; align-items: center; gap: 16px;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .logo { font-size:1.5rem; font-weight:800; letter-spacing:-.5px; background: linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    header p { color:var(--muted); font-size:.85rem; margin-left:auto; }
+
+    main { max-width:1300px; margin:0 auto; padding:32px 24px 80px; }
+
+    .controls { display:flex; flex-wrap:wrap; gap:14px; margin-bottom:32px; }
+    .search-wrap { position:relative; flex:1; min-width:240px; }
+    .search-wrap svg { position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none; }
+    input[type="search"] { width:100%; padding:12px 16px 12px 44px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); color:var(--text); font-size:.95rem; outline:none; transition:border-color .2s,box-shadow .2s; }
+    input[type="search"]:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(108,99,255,.2); }
+    input[type="search"]::placeholder { color:var(--muted); }
+    select { padding:12px 16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); color:var(--text); font-size:.95rem; cursor:pointer; outline:none; transition:border-color .2s; }
+    select:focus { border-color:var(--accent); }
+    option { background:var(--surface); }
+
+    .status-bar { display:flex; align-items:center; gap:10px; margin-bottom:20px; min-height:28px; }
+    .count { color:var(--muted); font-size:.9rem; }
+    .badge { padding:3px 10px; border-radius:20px; font-size:.78rem; font-weight:600; }
+    .badge-live  { background:rgba(72,199,142,.15); color:#48c78e; border:1px solid rgba(72,199,142,.3); }
+    .badge-local { background:rgba(108,99,255,.15); color:var(--accent); border:1px solid rgba(108,99,255,.3); }
+    .badge-cache { background:rgba(255,165,0,.12); color:#ffa500; border:1px solid rgba(255,165,0,.3); }
+
+    .info-banner { background:rgba(108,99,255,.1); border:1px solid rgba(108,99,255,.25); border-radius:var(--radius); padding:12px 18px; margin-bottom:20px; font-size:.85rem; color:var(--muted); display:flex; align-items:center; gap:10px; animation:fadeIn .3s ease; }
+
+    .skeleton-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:20px; }
+    .skeleton-card { background:var(--card); border-radius:var(--radius); overflow:hidden; height:340px; }
+    .skeleton-img  { height:160px; background:var(--surface); }
+    .skeleton-body { padding:20px; display:flex; flex-direction:column; gap:12px; }
+    .skeleton-line { height:14px; border-radius:6px; background:linear-gradient(90deg,var(--surface) 25%,var(--border) 50%,var(--surface) 75%); background-size:200% 100%; animation:shimmer 1.4s infinite; }
+    .skeleton-line.short { width:60%; }
+    .skeleton-line.medium { width:80%; }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+    #grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:20px; }
+
+    .card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; cursor:pointer; transition:transform .25s ease,box-shadow .25s ease,border-color .25s; animation:fadeIn .4s ease both; will-change:transform; }
+    .card:hover { transform:translateY(-6px) scale(1.01); box-shadow:var(--shadow),0 0 0 1px var(--accent); border-color:var(--accent); }
+    .card-flag { width:100%; height:160px; object-fit:cover; display:block; background:var(--surface); transition:transform .3s ease; }
+    .card:hover .card-flag { transform:scale(1.05); }
+    .card-body { padding:18px 20px 20px; }
+    .card-name  { font-size:1.05rem; font-weight:700; margin-bottom:10px; line-height:1.3; }
+    .card-info  { display:flex; flex-direction:column; gap:5px; }
+    .card-info span { font-size:.82rem; color:var(--muted); }
+    .card-info strong { color:var(--text); }
+
+    @keyframes fadeIn { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+    .card:nth-child(1){animation-delay:.02s}.card:nth-child(2){animation-delay:.04s}.card:nth-child(3){animation-delay:.06s}
+    .card:nth-child(4){animation-delay:.08s}.card:nth-child(5){animation-delay:.10s}.card:nth-child(6){animation-delay:.12s}
+    .card:nth-child(7){animation-delay:.14s}.card:nth-child(8){animation-delay:.16s}.card:nth-child(9){animation-delay:.18s}
+    .card:nth-child(10){animation-delay:.20s}.card:nth-child(11){animation-delay:.22s}.card:nth-child(12){animation-delay:.24s}
+
+    .empty { text-align:center; padding:80px 20px; color:var(--muted); animation:fadeIn .3s ease; }
+    .empty .icon { font-size:3rem; margin-bottom:16px; }
+    .empty h3 { font-size:1.1rem; color:var(--text); margin-bottom:8px; }
+
+    .overlay { position:fixed; inset:0; z-index:200; background:rgba(0,0,0,.65); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; padding:24px; opacity:0; visibility:hidden; transition:opacity .25s,visibility .25s; }
+    .overlay.open { opacity:1; visibility:visible; }
+    .modal { background:var(--surface); border:1px solid var(--border); border-radius:20px; max-width:680px; width:100%; max-height:90vh; overflow-y:auto; box-shadow:0 24px 60px rgba(0,0,0,.6); transform:scale(.92) translateY(20px); transition:transform .3s cubic-bezier(.34,1.56,.64,1); }
+    .overlay.open .modal { transform:scale(1) translateY(0); }
+    .modal-flag { width:100%; height:220px; object-fit:cover; border-radius:20px 20px 0 0; }
+    .modal-body { padding:28px 32px 32px; }
+    .modal-name { font-size:1.6rem; font-weight:800; margin-bottom:6px; }
+    .modal-native { color:var(--muted); font-size:.95rem; margin-bottom:24px; }
+    .modal-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px; }
+    .modal-stat { display:flex; flex-direction:column; gap:3px; }
+    .modal-stat .label { font-size:.78rem; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
+    .modal-stat .value { font-size:1rem; font-weight:600; }
+    .tags { display:flex; flex-wrap:wrap; gap:8px; }
+    .tag { padding:4px 12px; border-radius:20px; font-size:.8rem; background:rgba(108,99,255,.15); color:var(--accent); border:1px solid rgba(108,99,255,.25); }
+    .modal-close { position:absolute; top:16px; right:16px; background:rgba(255,255,255,.1); border:none; color:var(--text); width:36px; height:36px; border-radius:50%; font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .2s; }
+    .modal-close:hover { background:rgba(255,255,255,.2); }
+    .modal-header-wrap { position:relative; }
+
+    #toTop { position:fixed; bottom:28px; right:28px; z-index:150; background:var(--accent); color:#fff; border:none; width:44px; height:44px; border-radius:50%; font-size:1.2rem; cursor:pointer; box-shadow:0 4px 16px rgba(108,99,255,.5); display:flex; align-items:center; justify-content:center; opacity:0; visibility:hidden; transition:opacity .3s,visibility .3s,transform .2s; transform:translateY(10px); }
+    #toTop.visible { opacity:1; visibility:visible; transform:translateY(0); }
+    #toTop:hover { transform:translateY(-3px) !important; }
+
+    @media(max-width:600px){header{padding:14px 18px} main{padding:20px 14px 60px} .modal-body{padding:20px} .modal-grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><span>🌍</span> WorldExplorer</div>
+  <p id="headerStatus">Загрузка…</p>
+</header>
+
+<main>
+  <div class="controls">
+    <div class="search-wrap">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input type="search" id="searchInput" placeholder="Поиск страны или столицы…" autocomplete="off"/>
+    </div>
+    <select id="regionFilter">
+      <option value="">Все регионы</option>
+      <option value="Africa">Африка</option>
+      <option value="Americas">Америка</option>
+      <option value="Asia">Азия</option>
+      <option value="Europe">Европа</option>
+      <option value="Oceania">Океания</option>
+    </select>
+    <select id="sortSelect">
+      <option value="name">По названию (A–Z)</option>
+      <option value="pop-desc">По населению ↓</option>
+      <option value="pop-asc">По населению ↑</option>
+      <option value="area-desc">По площади ↓</option>
+    </select>
+  </div>
+
+  <div id="infoBanner" class="info-banner" style="display:none"></div>
+  <div class="status-bar">
+    <span class="count" id="countLabel"></span>
+    <span class="badge" id="sourceBadge"></span>
+  </div>
+
+  <div id="skeletonGrid" class="skeleton-grid"></div>
+  <div id="grid"></div>
+  <div id="emptyState" class="empty" style="display:none">
+    <div class="icon">🔍</div>
+    <h3>Ничего не найдено</h3>
+    <p>Попробуйте изменить запрос или сбросить фильтры</p>
+  </div>
+</main>
+
+<div class="overlay" id="overlay" role="dialog" aria-modal="true">
+  <div class="modal" id="modal">
+    <div class="modal-header-wrap">
+      <img class="modal-flag" id="modalFlag" src="" alt="Флаг"/>
+      <button class="modal-close" id="modalClose" aria-label="Закрыть">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-name" id="modalName"></div>
+      <div class="modal-native" id="modalNative"></div>
+      <div class="modal-grid" id="modalGrid"></div>
+      <div class="tags" id="modalTags"></div>
+    </div>
+  </div>
+</div>
+
+<button id="toTop" aria-label="Наверх">↑</button>
+
+<script>
+/* ══════════════════════════════════════════════════════════
+   ВСТРОЕННЫЕ ДАННЫЕ — работают без интернета и без сервера
+   Флаги: flagcdn.com (CDN, высокая доступность)
+══════════════════════════════════════════════════════════ */
+const BUILT_IN_DATA = [
+  // Европа
+  {name:{common:"Россия",official:"Российская Федерация"},flags:{png:"https://flagcdn.com/w320/ru.png"},capital:["Москва"],region:"Europe",subregion:"Eastern Europe",population:144104080,area:17098242,currencies:{RUB:{name:"Российский рубль",symbol:"₽"}},languages:{rus:"Русский"},timezones:["UTC+03:00"],continents:["Europe","Asia"]},
+  {name:{common:"Германия",official:"Федеративная Республика Германия"},flags:{png:"https://flagcdn.com/w320/de.png"},capital:["Берлин"],region:"Europe",subregion:"Western Europe",population:83240525,area:357114,currencies:{EUR:{name:"Евро",symbol:"€"}},languages:{deu:"Немецкий"},timezones:["UTC+01:00"],continents:["Europe"]},
+  {name:{common:"Франция",official:"Французская Республика"},flags:{png:"https://flagcdn.com/w320/fr.png"},capital:["Париж"],region:"Europe",subregion:"Western Europe",population:67391582,area:551695,currencies:{EUR:{name:"Евро",symbol:"€"}},languages:{fra:"Французский"},timezones:["UTC+01:00"],continents:["Europe"]},
+  {name:{common:"Великобритания",official:"Соединённое Королевство Великобритании и Северной Ирландии"},flags:{png:"https://flagcdn.com/w320/gb.png"},capital:["Лондон"],region:"Europe",subregion:"Northern Europe",population:67215293,area:242900,currencies:{GBP:{name:"Фунт стерлингов",symbol:"£"}},languages:{eng:"Английский"},timezones:["UTC"],continents:["Europe"]},
+  {name:{common:"Италия",official:"Итальянская Республика"},flags:{png:"https://flagcdn.com/w320/it.png"},capital:["Рим"],region:"Europe",subregion:"Southern Europe",population:59554023,area:301336,currencies:{EUR:{name:"Евро",symbol:"€"}},languages:{ita:"Итальянский"},timezones:["UTC+01:00"],continents:["Europe"]},
+  {name:{common:"Испания",official:"Королевство Испания"},flags:{png:"https://flagcdn.com/w320/es.png"},capital:["Мадрид"],region:"Europe",subregion:"Southern Europe",population:47351567,area:505990,currencies:{EUR:{name:"Евро",symbol:"€"}},languages:{spa:"Испанский"},timezones:["UTC+01:00"],continents:["Europe"]},
+  {name:{common:"Польша",official:"Республика Польша"},flags:{png:"https://flagcdn.com/w320/pl.png"},capital:["Варшава"],region:"Europe",subregion:"Central Europe",population:37950802,area:312679,currencies:{PLN:{name:"Злотый",symbol:"zł"}},languages:{pol:"Польский"},timezones:["UTC+01:00"],continents:["Europe"]},
+  {name:{common:"Нидерланды",official:"Королевство Нидерланды"},flags:{png:"https://flagcdn.com/w320/nl.png"},capital:["Амстердам"],region:"Europe",subregion:"Western Europe",population:17441139,area:41543,currencies:{EUR:{name:"Евро",symbol:"€"}},languages:{nld:"Нидерландский"},timezones:["UTC+01:00"],continents:["Europe"]},
+  {name:{common:"Швеция",official:"Королевство Швеция"},flags:{png:"https://flagcdn.com/w320/se.png"},capital:["Стокгольм"],region:"Europe",subregion:"Northern Europe",population:10353442,area:450295,currencies:{SEK:{name:"Шведская крона",symbol:"kr"}},languages:{swe:"Шведский"},timezones:["UTC+01:00"],continents:["Europe"]},
+  {name:{common:"Норвегия",official:"Королевство Норвегия"},flags:{png:"https://flagcdn.com/w320/no.png"},capital:["Осло"],region:"Europe",subregion:"Northern Europe",population:5379475,area:385207,currencies:{NOK:{name:"Норвежская крона",symbol:"kr"}},languages:{nor:"Норвежский"},timezones:["UTC+01:00"],continents:["Europe"]},
+  {name:{common:"Швейцария",official:"Швейцарская Конфедерация"},flags:{png:"https://flagcdn.com/w320/ch.png"},capital:["Берн"],region:"Europe",subregion:"Western Europe",population:8654622,area:41285,currencies:{CHF:{name:"Швейцарский франк",symbol:"Fr"}},languages:{deu:"Немецкий",fra:"Французский",ita:"Итальянский"},timezones:["UTC+01:00"],continents:["Europe"]},
+  {name:{common:"Австрия",official:"Австрийская Республика"},flags:{png:"https://flagcdn.com/w320/at.png"},capital:["Вена"],region:"Europe",subregion:"Central Europe",population:9006398,area:83871,currencies:{EUR:{name:"Евро",symbol:"€"}},languages:{deu:"Немецкий"},timezones:["UTC+01:00"],continents:["Europe"]},
+  {name:{common:"Турция",official:"Турецкая Республика"},flags:{png:"https://flagcdn.com/w320/tr.png"},capital:["Анкара"],region:"Europe",subregion:"Western Asia",population:84339067,area:783562,currencies:{TRY:{name:"Турецкая лира",symbol:"₺"}},languages:{tur:"Турецкий"},timezones:["UTC+03:00"],continents:["Asia","Europe"]},
+  {name:{common:"Португалия",official:"Португальская Республика"},flags:{png:"https://flagcdn.com/w320/pt.png"},capital:["Лиссабон"],region:"Europe",subregion:"Southern Europe",population:10305564,area:92212,currencies:{EUR:{name:"Евро",symbol:"€"}},languages:{por:"Португальский"},timezones:["UTC"],continents:["Europe"]},
+  // Азия
+  {name:{common:"Китай",official:"Китайская Народная Республика"},flags:{png:"https://flagcdn.com/w320/cn.png"},capital:["Пекин"],region:"Asia",subregion:"Eastern Asia",population:1402112000,area:9706961,currencies:{CNY:{name:"Китайский юань",symbol:"¥"}},languages:{zho:"Китайский"},timezones:["UTC+08:00"],continents:["Asia"]},
+  {name:{common:"Япония",official:"Япония"},flags:{png:"https://flagcdn.com/w320/jp.png"},capital:["Токио"],region:"Asia",subregion:"Eastern Asia",population:125681593,area:377930,currencies:{JPY:{name:"Японская иена",symbol:"¥"}},languages:{jpn:"Японский"},timezones:["UTC+09:00"],continents:["Asia"]},
+  {name:{common:"Индия",official:"Республика Индия"},flags:{png:"https://flagcdn.com/w320/in.png"},capital:["Нью-Дели"],region:"Asia",subregion:"Southern Asia",population:1380004385,area:3287590,currencies:{INR:{name:"Индийская рупия",symbol:"₹"}},languages:{hin:"Хинди",eng:"Английский"},timezones:["UTC+05:30"],continents:["Asia"]},
+  {name:{common:"Южная Корея",official:"Республика Корея"},flags:{png:"https://flagcdn.com/w320/kr.png"},capital:["Сеул"],region:"Asia",subregion:"Eastern Asia",population:51780579,area:100210,currencies:{KRW:{name:"Южнокорейская вона",symbol:"₩"}},languages:{kor:"Корейский"},timezones:["UTC+09:00"],continents:["Asia"]},
+  {name:{common:"Индонезия",official:"Республика Индонезия"},flags:{png:"https://flagcdn.com/w320/id.png"},capital:["Джакарта"],region:"Asia",subregion:"South-Eastern Asia",population:273523615,area:1904569,currencies:{IDR:{name:"Индонезийская рупия",symbol:"Rp"}},languages:{ind:"Индонезийский"},timezones:["UTC+07:00"],continents:["Asia","Oceania"]},
+  {name:{common:"Таиланд",official:"Королевство Таиланд"},flags:{png:"https://flagcdn.com/w320/th.png"},capital:["Бангкок"],region:"Asia",subregion:"South-Eastern Asia",population:69799978,area:513120,currencies:{THB:{name:"Тайский бат",symbol:"฿"}},languages:{tha:"Тайский"},timezones:["UTC+07:00"],continents:["Asia"]},
+  {name:{common:"Саудовская Аравия",official:"Королевство Саудовская Аравия"},flags:{png:"https://flagcdn.com/w320/sa.png"},capital:["Эр-Рияд"],region:"Asia",subregion:"Western Asia",population:34813871,area:2149690,currencies:{SAR:{name:"Саудовский риял",symbol:"﷼"}},languages:{ara:"Арабский"},timezones:["UTC+03:00"],continents:["Asia"]},
+  {name:{common:"ОАЭ",official:"Объединённые Арабские Эмираты"},flags:{png:"https://flagcdn.com/w320/ae.png"},capital:["Абу-Даби"],region:"Asia",subregion:"Western Asia",population:9890402,area:83600,currencies:{AED:{name:"Дирхам ОАЭ",symbol:"د.إ"}},languages:{ara:"Арабский"},timezones:["UTC+04:00"],continents:["Asia"]},
+  {name:{common:"Казахстан",official:"Республика Казахстан"},flags:{png:"https://flagcdn.com/w320/kz.png"},capital:["Астана"],region:"Asia",subregion:"Central Asia",population:18754440,area:2724900,currencies:{KZT:{name:"Казахстанский тенге",symbol:"₸"}},languages:{kaz:"Казахский",rus:"Русский"},timezones:["UTC+05:00"],continents:["Asia","Europe"]},
+  {name:{common:"Вьетнам",official:"Социалистическая Республика Вьетнам"},flags:{png:"https://flagcdn.com/w320/vn.png"},capital:["Ханой"],region:"Asia",subregion:"South-Eastern Asia",population:97338579,area:331212,currencies:{VND:{name:"Вьетнамский донг",symbol:"₫"}},languages:{vie:"Вьетнамский"},timezones:["UTC+07:00"],continents:["Asia"]},
+  // Америка
+  {name:{common:"США",official:"Соединённые Штаты Америки"},flags:{png:"https://flagcdn.com/w320/us.png"},capital:["Вашингтон"],region:"Americas",subregion:"Northern America",population:329484123,area:9372610,currencies:{USD:{name:"Доллар США",symbol:"$"}},languages:{eng:"Английский"},timezones:["UTC-05:00"],continents:["North America"]},
+  {name:{common:"Бразилия",official:"Федеративная Республика Бразилия"},flags:{png:"https://flagcdn.com/w320/br.png"},capital:["Бразилиа"],region:"Americas",subregion:"South America",population:212559417,area:8515767,currencies:{BRL:{name:"Бразильский реал",symbol:"R$"}},languages:{por:"Португальский"},timezones:["UTC-03:00"],continents:["South America"]},
+  {name:{common:"Канада",official:"Канада"},flags:{png:"https://flagcdn.com/w320/ca.png"},capital:["Оттава"],region:"Americas",subregion:"Northern America",population:38005238,area:9984670,currencies:{CAD:{name:"Канадский доллар",symbol:"$"}},languages:{eng:"Английский",fra:"Французский"},timezones:["UTC-05:00"],continents:["North America"]},
+  {name:{common:"Мексика",official:"Мексиканские Соединённые Штаты"},flags:{png:"https://flagcdn.com/w320/mx.png"},capital:["Мехико"],region:"Americas",subregion:"Central America",population:128932753,area:1964375,currencies:{MXN:{name:"Мексиканское песо",symbol:"$"}},languages:{spa:"Испанский"},timezones:["UTC-06:00"],continents:["North America"]},
+  {name:{common:"Аргентина",official:"Аргентинская Республика"},flags:{png:"https://flagcdn.com/w320/ar.png"},capital:["Буэнос-Айрес"],region:"Americas",subregion:"South America",population:45376763,area:2780400,currencies:{ARS:{name:"Аргентинское песо",symbol:"$"}},languages:{spa:"Испанский"},timezones:["UTC-03:00"],continents:["South America"]},
+  {name:{common:"Колумбия",official:"Республика Колумбия"},flags:{png:"https://flagcdn.com/w320/co.png"},capital:["Богота"],region:"Americas",subregion:"South America",population:50882891,area:1141748,currencies:{COP:{name:"Колумбийское песо",symbol:"$"}},languages:{spa:"Испанский"},timezones:["UTC-05:00"],continents:["South America"]},
+  {name:{common:"Чили",official:"Чилийская Республика"},flags:{png:"https://flagcdn.com/w320/cl.png"},capital:["Сантьяго"],region:"Americas",subregion:"South America",population:19116201,area:756102,currencies:{CLP:{name:"Чилийское песо",symbol:"$"}},languages:{spa:"Испанский"},timezones:["UTC-04:00"],continents:["South America"]},
+  // Африка
+  {name:{common:"Египет",official:"Арабская Республика Египет"},flags:{png:"https://flagcdn.com/w320/eg.png"},capital:["Каир"],region:"Africa",subregion:"Northern Africa",population:102334404,area:1002450,currencies:{EGP:{name:"Египетский фунт",symbol:"£"}},languages:{ara:"Арабский"},timezones:["UTC+02:00"],continents:["Africa"]},
+  {name:{common:"Нигерия",official:"Федеративная Республика Нигерия"},flags:{png:"https://flagcdn.com/w320/ng.png"},capital:["Абуджа"],region:"Africa",subregion:"Western Africa",population:206139589,area:923768,currencies:{NGN:{name:"Нигерийская найра",symbol:"₦"}},languages:{eng:"Английский"},timezones:["UTC+01:00"],continents:["Africa"]},
+  {name:{common:"Эфиопия",official:"Федеративная Демократическая Республика Эфиопия"},flags:{png:"https://flagcdn.com/w320/et.png"},capital:["Аддис-Абеба"],region:"Africa",subregion:"Eastern Africa",population:114963588,area:1104300,currencies:{ETB:{name:"Эфиопский быр",symbol:"Br"}},languages:{amh:"Амхарский"},timezones:["UTC+03:00"],continents:["Africa"]},
+  {name:{common:"ЮАР",official:"Южно-Африканская Республика"},flags:{png:"https://flagcdn.com/w320/za.png"},capital:["Претория"],region:"Africa",subregion:"Southern Africa",population:59308690,area:1221037,currencies:{ZAR:{name:"Южноафриканский рэнд",symbol:"R"}},languages:{zul:"Зулусский",afr:"Африкаанс",eng:"Английский"},timezones:["UTC+02:00"],continents:["Africa"]},
+  {name:{common:"Кения",official:"Республика Кения"},flags:{png:"https://flagcdn.com/w320/ke.png"},capital:["Найроби"],region:"Africa",subregion:"Eastern Africa",population:53771296,area:580367,currencies:{KES:{name:"Кенийский шиллинг",symbol:"Ksh"}},languages:{swa:"Суахили",eng:"Английский"},timezones:["UTC+03:00"],continents:["Africa"]},
+  {name:{common:"Марокко",official:"Королевство Марокко"},flags:{png:"https://flagcdn.com/w320/ma.png"},capital:["Рабат"],region:"Africa",subregion:"Northern Africa",population:36910560,area:446550,currencies:{MAD:{name:"Марокканский дирхам",symbol:"MAD"}},languages:{ara:"Арабский",ber:"Берберский"},timezones:["UTC+01:00"],continents:["Africa"]},
+  // Океания
+  {name:{common:"Австралия",official:"Австралия"},flags:{png:"https://flagcdn.com/w320/au.png"},capital:["Канберра"],region:"Oceania",subregion:"Australia and New Zealand",population:25499884,area:7692024,currencies:{AUD:{name:"Австралийский доллар",symbol:"$"}},languages:{eng:"Английский"},timezones:["UTC+10:00"],continents:["Oceania"]},
+  {name:{common:"Новая Зеландия",official:"Новая Зеландия"},flags:{png:"https://flagcdn.com/w320/nz.png"},capital:["Веллингтон"],region:"Oceania",subregion:"Australia and New Zealand",population:5084300,area:268021,currencies:{NZD:{name:"Новозеландский доллар",symbol:"$"}},languages:{eng:"Английский",mri:"Маори"},timezones:["UTC+12:00"],continents:["Oceania"]},
+  {name:{common:"Фиджи",official:"Республика Фиджи"},flags:{png:"https://flagcdn.com/w320/fj.png"},capital:["Сува"],region:"Oceania",subregion:"Melanesia",population:896444,area:18272,currencies:{FJD:{name:"Фиджийский доллар",symbol:"$"}},languages:{eng:"Английский",fij:"Фиджийский"},timezones:["UTC+12:00"],continents:["Oceania"]},
+];
+
+/* ══════════════════════════════════════════════════════
+   STATE
+══════════════════════════════════════════════════════ */
+let allCountries = [...BUILT_IN_DATA]; // сразу доступны
+let dataSource   = 'local';            // 'local' | 'cache' | 'live'
+const CACHE_KEY  = 'we_countries_v3';
+const CACHE_TTL  = 30 * 60 * 1000;
+
+/* ══════════════════════════════════════════════════════
+   SKELETON
+══════════════════════════════════════════════════════ */
+const skeletonGrid = document.getElementById('skeletonGrid');
+for (let i = 0; i < 12; i++) {
+  skeletonGrid.innerHTML += `<div class="skeleton-card"><div class="skeleton-img"></div><div class="skeleton-body"><div class="skeleton-line medium"></div><div class="skeleton-line short"></div><div class="skeleton-line medium"></div><div class="skeleton-line short"></div></div></div>`;
+}
+
+/* ══════════════════════════════════════════════════════
+   HELPERS
+══════════════════════════════════════════════════════ */
+const fmt = n => n ? n.toLocaleString('ru-RU') : '—';
+function getCurrency(c){ if(!c.currencies) return '—'; return Object.values(c.currencies).map(v=>`${v.name}${v.symbol?' ('+v.symbol+')':''}`).join(', '); }
+function getLangs(c){ if(!c.languages) return '—'; return Object.values(c.languages).join(', '); }
+function getNative(c){
+  if(c.nativeName) return c.nativeName;
+  if(!c.name?.nativeName) return '';
+  const v=Object.values(c.name.nativeName); return (v[0]?.common||v[0]?.official||'');
+}
+
+/* ══════════════════════════════════════════════════════
+   RENDER
+══════════════════════════════════════════════════════ */
+function buildCard(c) {
+  const div = document.createElement('div');
+  div.className = 'card';
+  div.innerHTML = `
+    <img class="card-flag" src="${c.flags?.png||''}" alt="Флаг ${c.name.common}" loading="lazy" onerror="this.style.display='none'"/>
+    <div class="card-body">
+      <div class="card-name">${c.name.common}</div>
+      <div class="card-info">
+        <span><strong>Столица:</strong> ${c.capital?.[0]||'—'}</span>
+        <span><strong>Регион:</strong> ${c.region||'—'}</span>
+        <span><strong>Население:</strong> ${fmt(c.population)}</span>
+        <span><strong>Площадь:</strong> ${c.area ? fmt(c.area)+' км²':'—'}</span>
+      </div>
+    </div>`;
+  div.addEventListener('click', ()=>openModal(c));
+  return div;
+}
+
+function renderGrid(list) {
+  const grid  = document.getElementById('grid');
+  const empty = document.getElementById('emptyState');
+  grid.innerHTML = '';
+  if (!list.length) { empty.style.display='block'; document.getElementById('countLabel').textContent=''; return; }
+  empty.style.display = 'none';
+  const frag = document.createDocumentFragment();
+  list.forEach(c => frag.appendChild(buildCard(c)));
+  grid.appendChild(frag);
+  document.getElementById('countLabel').textContent = `Показано: ${list.length} стран`;
+}
+
+/* ══════════════════════════════════════════════════════
+   FILTER + SORT
+══════════════════════════════════════════════════════ */
+function getFiltered() {
+  const q   = document.getElementById('searchInput').value.trim().toLowerCase();
+  const reg = document.getElementById('regionFilter').value;
+  const srt = document.getElementById('sortSelect').value;
+  let arr = allCountries.filter(c => {
+    const name = c.name.common.toLowerCase();
+    const cap  = (c.capital?.[0]||'').toLowerCase();
+    return (!q||name.includes(q)||cap.includes(q)) && (!reg||c.region===reg);
+  });
+  if(srt==='name')     arr.sort((a,b)=>a.name.common.localeCompare(b.name.common,'ru'));
+  if(srt==='pop-desc') arr.sort((a,b)=>(b.population||0)-(a.population||0));
+  if(srt==='pop-asc')  arr.sort((a,b)=>(a.population||0)-(b.population||0));
+  if(srt==='area-desc')arr.sort((a,b)=>(b.area||0)-(a.area||0));
+  return arr;
+}
+
+let debounceTimer;
+function onFilterChange(){ clearTimeout(debounceTimer); debounceTimer=setTimeout(()=>renderGrid(getFiltered()),180); }
+document.getElementById('searchInput').addEventListener('input', onFilterChange);
+document.getElementById('regionFilter').addEventListener('change', onFilterChange);
+document.getElementById('sortSelect').addEventListener('change', onFilterChange);
+
+/* ══════════════════════════════════════════════════════
+   STATUS BADGE
+══════════════════════════════════════════════════════ */
+function updateBadge() {
+  const badge  = document.getElementById('sourceBadge');
+  const header = document.getElementById('headerStatus');
+  if(dataSource==='live'){
+    badge.className='badge badge-live'; badge.textContent='Данные актуальны';
+    header.textContent=`Загружено ${allCountries.length} стран с API`;
+  } else if(dataSource==='cache'){
+    badge.className='badge badge-cache'; badge.textContent='Из кэша';
+    header.textContent=`Кэш: ${allCountries.length} стран`;
+  } else {
+    badge.className='badge badge-local'; badge.textContent='Встроенные данные';
+    header.textContent=`${allCountries.length} стран (встроено)`;
+  }
+}
+
+function showInfo(msg) {
+  const el = document.getElementById('infoBanner');
+  el.style.display='flex'; el.innerHTML=`<span>ℹ️</span> ${msg}`;
+}
+
+/* ══════════════════════════════════════════════════════
+   FETCH (фоновый, не блокирует рендер)
+══════════════════════════════════════════════════════ */
+async function tryFetchAPI() {
+  // Сначала проверим кэш
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if(raw) {
+      const {ts, data} = JSON.parse(raw);
+      if(Date.now()-ts < CACHE_TTL && data.length > 50) {
+        allCountries = data; dataSource='cache';
+        updateBadge(); renderGrid(getFiltered()); return;
+      }
+    }
+  } catch {}
+
+  // Попробуем API
+  const ENDPOINTS = [
+    'https://restcountries.com/v3.1/all?fields=name,flags,capital,region,subregion,population,area,currencies,languages,timezones,continents',
+    'https://restcountries.com/v3.1/all?fields=name,flags,capital,region,subregion,population,area,currencies,languages,timezones,continents&v=1',
+    { headers: { 'Authorization': 'Bearer rc_live_fbc700fa97664d13841d619f7d726b56' } }
+  ];
+
+  for(const url of ENDPOINTS) {
+    try {
+      const ctrl = new AbortController();
+      const tid  = setTimeout(()=>ctrl.abort(), 7000);
+      const res  = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(tid);
+      if(!res.ok) continue;
+      const data = await res.json();
+      if(!Array.isArray(data) || data.length < 100) continue;
+      allCountries = data; dataSource='live';
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(), data})); } catch {}
+      updateBadge(); renderGrid(getFiltered());
+      return;
+    } catch(e) {
+      // попробуем следующий endpoint
+    }
+  }
+
+  // API недоступен — продолжаем с встроенными данными (уже показаны)
+  showInfo('API недоступен в данный момент — используются встроенные данные для ' + allCountries.length + ' стран.');
+}
+
+/* ══════════════════════════════════════════════════════
+   MODAL
+══════════════════════════════════════════════════════ */
+function openModal(c) {
+  document.getElementById('modalFlag').src = c.flags?.png||'';
+  document.getElementById('modalName').textContent = c.name.common;
+  const native = getNative(c);
+  document.getElementById('modalNative').textContent = (native && native!==c.name.common) ? native : (c.name.official||'');
+  document.getElementById('modalGrid').innerHTML = `
+    <div class="modal-stat"><span class="label">Столица</span><span class="value">${c.capital?.[0]||'—'}</span></div>
+    <div class="modal-stat"><span class="label">Регион</span><span class="value">${c.region}${c.subregion?' / '+c.subregion:''}</span></div>
+    <div class="modal-stat"><span class="label">Население</span><span class="value">${fmt(c.population)}</span></div>
+    <div class="modal-stat"><span class="label">Площадь</span><span class="value">${c.area?fmt(c.area)+' км²':'—'}</span></div>
+    <div class="modal-stat"><span class="label">Валюта</span><span class="value">${getCurrency(c)}</span></div>
+    <div class="modal-stat"><span class="label">Языки</span><span class="value">${getLangs(c)}</span></div>
+    <div class="modal-stat"><span class="label">Часовые пояса</span><span class="value">${(c.timezones||[]).slice(0,3).join(', ')||'—'}</span></div>
+    <div class="modal-stat"><span class="label">Континент</span><span class="value">${(c.continents||[]).join(', ')||'—'}</span></div>`;
+  const tags = document.getElementById('modalTags');
+  tags.innerHTML='';
+  (c.timezones||[]).forEach(tz=>{ const t=document.createElement('span'); t.className='tag'; t.textContent=tz; tags.appendChild(t); });
+  document.getElementById('overlay').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeModal(){ document.getElementById('overlay').classList.remove('open'); document.body.style.overflow=''; }
+document.getElementById('modalClose').addEventListener('click', closeModal);
+document.getElementById('overlay').addEventListener('click', e=>{ if(e.target===document.getElementById('overlay')) closeModal(); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
+
+/* ══════════════════════════════════════════════════════
+   SCROLL TO TOP
+══════════════════════════════════════════════════════ */
+const toTopBtn = document.getElementById('toTop');
+window.addEventListener('scroll', ()=>toTopBtn.classList.toggle('visible', window.scrollY>300));
+toTopBtn.addEventListener('click', ()=>window.scrollTo({top:0,behavior:'smooth'}));
+
+/* ══════════════════════════════════════════════════════
+   INIT — сначала рендерим встроенные данные МГНОВЕННО,
+           потом в фоне пробуем API
+══════════════════════════════════════════════════════ */
+(function init() {
+  // 1. Сразу скрываем скелетон и показываем встроенные данные
+  skeletonGrid.style.display='none';
+  updateBadge();
+  renderGrid(getFiltered());
+
+  // 2. В фоне пробуем получить полный список с API
+  tryFetchAPI();
+})();
+</script>
+</body>
+</html>
